@@ -212,26 +212,3 @@ class InfiArray {
 
 
 #endif  /* _INFI_ARRAY_H_ */
-
-
-
-
-  /**
-   *  @brief  Provides access to the data contained in the %InfiArray.
-   *  @param n The index of the element for which data should be accessed.
-   *  @return  Value of the data.
-   *
-   *  This function provides for simple data access.
-   */
-  //value_type at(size_type __n) const;
-
-  /**
-   *  @brief  Provides access to the data contained in the %InfiArray.
-   *  @param n The index of the element for which data should be accessed.
-   *  @return  Read/write reference to data.
-   *
-   *  This function provides for simple data access.
-   *  If requested block does not exists, it will be allocated.
-   */
-  //reference at(size_type __n);
-
