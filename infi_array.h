@@ -9,7 +9,7 @@
 #define __GET_BLOCK_KEY(x) (x & _UPPER_MASK)
 
 #include <cstring>
-#include <map>
+#include <unordered_map>
 
 
 class InfiArray {
@@ -146,9 +146,9 @@ class InfiArray {
   */
   value_type* _get_block(size_type __key) const {
     __key = __GET_BLOCK_KEY(__key);
-    auto __i = _memory.lower_bound(__key);
+    auto __i = _memory.find(__key);
 
-    if (__i == _memory.end() || _memory.key_comp()(__key, (*__i).first))
+    if (__i == _memory.end())
       return nullptr;
     return (*__i).second;
   }
@@ -207,7 +207,7 @@ class InfiArray {
     return _get_block(__key) != nullptr;
   }
 
-  std::map<size_type, value_type*> _memory;
+  std::unordered_map<size_type, value_type*> _memory;
 };
 
 
