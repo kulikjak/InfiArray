@@ -9,8 +9,8 @@
 #define __GET_BLOCK_KEY(x) (x & _UPPER_MASK)
 #define __GET_BLOCK_IDX(x) (x & _LOWER_MASK)
 
-#include <cstring>
 #include <cstdio>
+#include <cstring>
 #include <unordered_map>
 
 class InfiArray {
@@ -22,11 +22,15 @@ class InfiArray {
 
   typedef value_type* pointer;
   typedef value_type& reference;
-  typedef const value_type& const_reference;
 
   typedef std::unordered_map<size_type, value_type*> infi_map;
 
-  class const_iterator {
+  /**  Iterator forward declarations  **/
+  class iterator;
+  class const_iterator;
+
+  template <bool _ConstIterator = true>
+  class _base_iterator {
    public:
     typedef InfiArray::pointer pointer;
     typedef InfiArray::reference reference;
@@ -34,34 +38,37 @@ class InfiArray {
     typedef InfiArray::difference_type difference_type;
     typedef std::bidirectional_iterator_tag iterator_category;
 
-    /**  Default constructor with no effect.  */
-    const_iterator() {}
+    typedef typename std::conditional<_ConstIterator, const InfiArray*,
+                                      InfiArray*>::type _InfiType;
+    typedef typename std::conditional<_ConstIterator, const value_type*,
+                                      value_type*>::type _InfiArrayBlock;
+    typedef typename std::conditional<_ConstIterator, const_iterator,
+                                      iterator>::type _IteratorType;
 
-    /**
-     *  @brief  %const_iterator copy constructor.
-     *  @param  x  A %const_iterator.
-     */
-    const_iterator(const const_iterator& __it)
+    _base_iterator() {}
+
+    _base_iterator(const _IteratorType& __it)
         : _key(__it._key),
           _index(__it._index),
-          _iter(__it._iter),
-          _memory(__it._memory) {}
+          _block(__it._block),
+          _array(__it._array) {}
 
-    /**
-     *  @brief  %InfiArray constructor.
-     *  @param  m  Pointer to InfiArray memory map.
-     *  @param  n  Index of iterator pointer.
-     */
-    const_iterator(const infi_map* __m, size_type __n) : _memory(__m) {
+    _base_iterator(_InfiType __a, size_type __n) : _array(__a) {
       _key = __GET_BLOCK_KEY(__n);
       _index = __GET_BLOCK_IDX(__n);
-      _iter = _memory->find(_key);
+      _block = _array->_get_block(_key);
     }
 
-    /**  Const value access operator.  */
-    value_type operator*() const {
-      if (_iter == _memory->end()) return 0;
-      return (*_iter).second[_index];
+    /**
+     *  @brief  %_IteratorType assignment operator.
+     *  @param  x  A %_IteratorType.
+     */
+    _IteratorType& operator=(const _IteratorType& __it) {
+      _key = __it._key;
+      _index = __it._index;
+      _block = __it._block;
+      _array = __it._array;
+      return *this;
     }
 
     /**
@@ -69,20 +76,9 @@ class InfiArray {
      *
      *  This moves iterator one memory cell forward prior to its evaluation.
      */
-    const_iterator& operator++() {
+    _IteratorType& operator++() {
       _forward();
-      return *this;
-    }
-
-    /**
-     *  @brief  Postfix iterator increment operator
-     *
-     *  This moves iterator one memory cell forward after its evaluation.
-     */
-    const_iterator operator++(int) {
-      const_iterator __old = *this;
-      _forward();
-      return __old;
+      return static_cast<_IteratorType&>(*this);
     }
 
     /**
@@ -90,9 +86,20 @@ class InfiArray {
      *
      *  This moves iterator one memory cell backward prior to its evaluation.
      */
-    const_iterator& operator--() {
+    _IteratorType& operator--() {
       _backward();
-      return *this;
+      return static_cast<_IteratorType&>(*this);
+    }
+
+    /**
+     *  @brief  Postfix iterator increment operator
+     *
+     *  This moves iterator one memory cell forward after its evaluation.
+     */
+    _IteratorType operator++(int) {
+      _IteratorType __old(static_cast<_IteratorType&>(*this));
+      _forward();
+      return __old;
     }
 
     /**
@@ -100,49 +107,37 @@ class InfiArray {
      *
      *  This moves iterator one memory cell backward after its evaluation.
      */
-    const_iterator operator--(int) {
-      const_iterator __old = *this;
+    _IteratorType operator--(int) {
+      _IteratorType __old(static_cast<_IteratorType&>(*this));
       _backward();
       return __old;
     }
 
     /**
-     *  @brief  %const_iterator assignment operator.
-     *  @param  x  A %const_iterator.
-     */
-    const_iterator& operator=(const const_iterator& __it) {
-      _key = __it._key;
-      _index = __it._index;
-      _iter = __it._iter;
-      _memory = __it._memory;
-      return *this;
-    }
-
-    /**
      *  @brief  Iterator equality comparison.
-     *  @param  it  A %const_iterator.
+     *  @param  it  A %_IteratorType.
      *  @return  True iff both iterators point on same memory cell.
     */
-    bool operator==(const const_iterator& __it) const {
-      return (_index == __it._index) && (_key == __it._key);
+    bool operator==(const _IteratorType& __it) const {
+      return (_key == __it._key) && (_index == __it._index);
     }
 
     /**
      *  @brief  Iterator inequality comparison.
-     *  @param  it  A %const_iterator.
+     *  @param  it  A %_IteratorType.
      *  @return  False iff both iterators point on same memory cell.
     */
-    bool operator!=(const const_iterator& __it) const {
-      return (_index != __it._index) || (_key != __it._key);
+    bool operator!=(const _IteratorType& __it) const {
+      return (_key != __it._key) || (_index != __it._index);
     }
 
-   private:
+   protected:
     /**  Move iterator fotward to next index.  */
     void _forward() {
       if (++_index >= _BLOCK_SIZE) {
         _index = 0;
         _key += _BLOCK_SIZE;
-        _iter = _memory->find(_key);
+        _block = _array->_get_block(_key);
       }
     }
 
@@ -151,7 +146,7 @@ class InfiArray {
       if (_index == 0) {
         _index = _BLOCK_SIZE;
         _key -= _BLOCK_SIZE;
-        _iter = _memory->find(_key);
+        _block = _array->_get_block(_key);
       }
       _index--;
     }
@@ -159,9 +154,60 @@ class InfiArray {
     size_type _key;
     size_type _index;
 
-    infi_map::const_iterator _iter;
-    const infi_map* _memory;
+    _InfiType _array;
+    _InfiArrayBlock _block;
     friend class InfiArray;
+  };
+
+  class const_iterator : public _base_iterator<true> {
+   public:
+    /**  Default constructor with no effect.  */
+    const_iterator() : _base_iterator() {}
+
+    /**
+     *  @brief  %const_iterator copy constructor.
+     *  @param  it  A %const_iterator.
+     */
+    const_iterator(const const_iterator& __it) : _base_iterator(__it) {}
+
+    /**
+     *  @brief  %const_iterator constructor.
+     *  @param  m  Pointer to InfiArray memory map.
+     *  @param  n  Index of iterator pointer.
+     */
+    const_iterator(const InfiArray* __a, size_type __n)
+        : _base_iterator(__a, __n) {}
+
+    /**  Const value access operator.  **/
+    value_type operator*() const {
+      if (_block == nullptr) return 0;
+      return _block[_index];
+    }
+  };
+
+  class iterator : public _base_iterator<false> {
+   public:
+    /**  Default constructor with no effect.  */
+    iterator() : _base_iterator() {}
+
+    /**
+     *  @brief  %iterator copy constructor.
+     *  @param  it  A %iterator.
+     */
+    iterator(const iterator& __it) : _base_iterator(__it) {}
+
+    /**
+     *  @brief  %iterator constructor.
+     *  @param  m  Pointer to InfiArray memory map.
+     *  @param  n  Index of iterator pointer.
+     */
+    iterator(InfiArray* __a, size_type __n) : _base_iterator(__a, __n) {}
+
+    /**  Non-const reference access operator.  **/
+    reference operator*() {
+      if (_block == nullptr) _block = _array->_alloc_block(_key);
+      return _block[_index];
+    }
   };
 
   /**  Default constructor creates no elements.  */
@@ -194,12 +240,18 @@ class InfiArray {
   }
 
   /**
+   *  Returns a read/write iterator that points to the requested
+   *  element in the %InfiArray. Iteration is done in ordinary element order.
+   */
+  iterator get_iterator(size_type __n) { return iterator(this, __n); }
+
+  /**
    *  Returns a read-only (constant) iterator that points to the
    *  requested element in the %InfiArray. Iteration is done in ordinary
    *  element order.
    */
-  const_iterator get_iterator(size_type __n) const {
-    return const_iterator((&_memory), __n);
+  const_iterator get_const_iterator(size_type __n) const {
+    return const_iterator(this, __n);
   }
 
   /**
@@ -303,9 +355,11 @@ class InfiArray {
    *  A key can be any value for given memory block as it is rouded down
    *  to correct memory block address.
   */
-  void _alloc_block(size_type __key) {
+  value_type* _alloc_block(size_type __key) {
     if (_block_existence(__key)) throw;
-    _memory[__GET_BLOCK_KEY(__key)] = new value_type[_BLOCK_SIZE]();
+    value_type* __block = new value_type[_BLOCK_SIZE]();
+    _memory[__GET_BLOCK_KEY(__key)] = __block;
+    return __block;
   }
 
   /**
