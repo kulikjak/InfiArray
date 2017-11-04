@@ -5,7 +5,10 @@ all: performance
 performance: performance.cc
 	$(CXX) $^ -o $@
 
-clean:
-	rm -f performance
+tests: tests.cc
+	$(CXX) $^ -o $@
 
-.PHONY: all performance clean
+clean:
+	rm -f performance tests
+
+.PHONY: all performance tests clean
