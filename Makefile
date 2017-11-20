@@ -1,6 +1,6 @@
 CXX = g++ -o0 --std=c++11
 
-all: performance
+all: performance tests
 
 performance: performance.cc
 	$(CXX) $^ -o $@
@@ -11,4 +11,4 @@ tests: tests.cc
 clean:
 	rm -f performance tests
 
-.PHONY: all performance tests clean
+.PHONY: all clean
